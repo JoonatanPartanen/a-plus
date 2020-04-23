@@ -26,6 +26,9 @@
 <!--Library for pipelining operations using Observables-->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/rxjs/6.5.3/rxjs.umd.min.js" integrity="sha256-opvkRN8JcEjsFLLVkYM5d5n54MuZJBkljuRb5E4sQrk=" crossorigin="anonymous"></script>
 
+<!--Library to make debugging rxjs a whole lot easier-->
+<script src="https://unpkg.com/rxjs-spy@7/bundles/rxjs-spy.min.umd.js"></script>
+
 <!--Custom for loading animation (loading_animation.css) and other extra customizations (results_staff.css)
     results_staff.js is the main script for this page. -->
 <link rel="stylesheet" href="{% static 'exercise/css/loading_animation.css' %}" />
@@ -150,13 +153,13 @@
 		<!--Navigation bar to choose how data is shown-->
 		<ul style="margin: 10px 0px 50px 0px;" id="exercise-nav-tabs" class="nav nav-tabs">
 			<li id="difficulty-exercises" role="presentation" class="active">
-				<a onclick="createPointTable('difficulty');" data-toggle="tab" href="#">{% trans "Show exercises by difficulty" %}</a>
+				<a onclick="choosePointsGroupingMethod('difficulty');" data-toggle="tab" href="#">{% trans "Show exercises by difficulty" %}</a>
 			</li>
 			<li id="module-exercises" role="presentation">
-				<a onclick="createPointTable('module');" data-toggle="tab" href="#">{% trans "Show exercises by module" %}</a>
+				<a onclick="choosePointsGroupingMethod('module');" data-toggle="tab" href="#">{% trans "Show exercises by module" %}</a>
 			</li>
 			<li id="all-exercises" role="presentation">
-				<a onclick="createPointTable('all');" data-toggle="tab" href="#">{% trans "Show all exercises" %}</a>
+				<a onclick="choosePointsGroupingMethod('all');" data-toggle="tab" href="#">{% trans "Show all exercises" %}</a>
 			</li>
 		</ul>
 

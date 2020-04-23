@@ -1,5 +1,11 @@
-let { Observable, Subject } = rxjs;
-let { map, publish, first, zip } = rxjs.operators;
+const { Observable, Subject } = rxjs;
+const { map, first, count } = rxjs.operators;
+
+const tag = rxjsSpy.operators.tag;
+spy = rxjsSpy.create();
+spy.log("users");
+
+
 
 (function($, document, window, undefined) {
     let currentScript = (document.currentScript ?
@@ -11,7 +17,10 @@ let { map, publish, first, zip } = rxjs.operators;
     const usertagsUrl = currentScript.data("usertagsUrl");
     const pointsUrl = currentScript.data("pointsUrl");
 
+    let _tagSlugFilters;
     let _exerciseSelection;
+    let _studentCount;
+    let _studentsVisibleCount = 0;
     let _allExercises = [];
     let _exercises;
     let _students;
@@ -554,7 +563,7 @@ let { map, publish, first, zip } = rxjs.operators;
             pointKeys.forEach(function(name) {
                 dataVals.push([
                     totalSubmitters[name] || 0,
-                    totalSubmitters[name] / filteredStudentPool.length * 100 || 0
+                    totalSubmitters[name] / _studentsVisibleCount * 100 || 0
                 ]);
             });
 
@@ -619,7 +628,7 @@ let { map, publish, first, zip } = rxjs.operators;
         $("#table-body").append(htmlTablePoints);
         $(".colortag-active").css("margin-right", "5px");
         $("#student-count").append(
-            ' (<span id="selected-number">' + filteredStudentPool.length + '</span> / '
+            ' (<span id="selected-number">' + _studentsVisibleCount + '</span> / '
             + '<span id="participants-number">'+ _students.length + '</span>'
             + _(' students selected') + ')'
         );
@@ -847,21 +856,15 @@ let { map, publish, first, zip } = rxjs.operators;
     function studentVisibility(student) {
         // Pick only students that have the selected tags
         // Use same logic for tag filtering as in participants.js
-        const tagSlugFilters = $.makeArray($('.filter-users button:has(.glyphicon-check)'))
-        .map(function(elem) {
-            return $(elem).data('tagSlug');
-        });
         let studentTagSlugs = student.tag_slugs;
 
-        // Set intercetion tags ∩ filters
+        // Set intersection tags ∩ filters
         const intersect = studentTagSlugs.filter(function (tag) {
             return tagSlugFilters.indexOf(tag) >= 0;
         });
 
         // Only create the row for a student, if they have one of the tags that are currently selected
-        if (intersect.length === tagSlugFilters.length) {
-            filteredStudentPool.push(student);
-        }
+        return intersect.length === tagSlugFilters.length;
     };
  
     /*
@@ -870,6 +873,20 @@ let { map, publish, first, zip } = rxjs.operators;
      */
     function exerciseSelectionChange() {
         _exerciseSelection = $('#exercise-selection option:selected');
+        
+        _tagSlugFilters = $.makeArray($('.filter-users button:has(.glyphicon-check)'))
+        .map(function(elem) {
+            return $(elem).data('tagSlug');
+        });
+    }
+
+    function filterTable() {
+        
+        $('#table-points tr').each(function(){
+            $(this).find('td').each(function(){
+                //do your stuff, you can use $(this) to get current cell
+            })
+        })
     }
 
     function getGroupingMethod() { 
@@ -884,10 +901,19 @@ let { map, publish, first, zip } = rxjs.operators;
         }
     }
 
+    function initObjectWithKeys(keys, val) {
+        let obj = {};
+        keys.forEach(function (key) {
+            obj[key] = val;
+        });
+        return obj
+    }
+        
+
     let pointsGroupingMethods = ["difficulty", "module", "all"];
 
     let htmlTablePoints = "";
-    let pointKeys = Object.fromEntries(pointsGroupingMethods.map(function(method) { return [method, []] }));
+    let pointKeys = initObjectWithKeys(pointsGroupingMethods, []);
 
     let totalSubmitters = {}; 
     let totalMaxSubmitters = {};
@@ -895,10 +921,10 @@ let { map, publish, first, zip } = rxjs.operators;
     let maxAllowedSubmissions = {};
     let maxPoints = {};
     // Initialise totals with zeros
-    let maxPointsTotal = Object.fromEntries(pointsGroupingMethods.map(function(method) { return [method, 0] })); 
+    let maxPointsTotal = initObjectWithKeys(pointsGroupingMethods, 0); 
     let totalPoints = {};
 
-    let modulesSeen = Object.fromEntries(pointsGroupingMethods.map(function(method) { return [method, []] }));
+    let modulesSeen = initObjectWithKeys(pointsGroupingMethods, []);
 
     // Has to be called once for each grouping method to establish the assumably unchanging characteristics of the exercises and modules
     function tableDrawPreWork(firstPoints, pointsGroupingMethod) {
@@ -967,11 +993,11 @@ let { map, publish, first, zip } = rxjs.operators;
         });
     }
 
-    studentRendererObserver = {
+    let studentRendererObserver = {
         // Gather personal information for each student, eg. individual points
         next(studentAndPoints) {
-            let student = studentsAndPoints.student;
-            let _points = studentsAndPoints.points;
+            let student = studentAndPoints.student;
+            let _points = studentAndPoints.points;
             let allPointsTotalAddedToRow = false;
 
             // Start the table row with the student's id, summary and full name
@@ -1150,7 +1176,9 @@ let { map, publish, first, zip } = rxjs.operators;
                 $("#table-heading-row").append('<th>' + _("Total") + '</th>');
             }
 
-            pointsGroupingMethods.foreach(function(pointsGroupingMethod) {
+            let htmlTableIndicators = "";
+
+            pointsGroupingMethods.forEach(function(pointsGroupingMethod) {
                 pointKeys[pointsGroupingMethod].forEach(function(name) {
                     if (pointsGroupingMethod === "difficulty" && name === "") {
                         $("#table-heading-row").append('<th scope="col">' + _("No difficulty") + '</th>');
@@ -1159,8 +1187,6 @@ let { map, publish, first, zip } = rxjs.operators;
                     }
                 });
 
-
-                let htmlTableIndicators = "";
 
                 if (_totalSubmTrue) {
                     let dataVals = [];
@@ -1227,7 +1253,7 @@ let { map, publish, first, zip } = rxjs.operators;
                     pointKeys[pointsGroupingMethod].forEach(function(name) {
                         dataVals.push([
                             totalSubmitters[pointsGroupingMethod][name] || 0,
-                            totalSubmitters[pointsGroupingMethod][name] / filteredStudentPool.length * 100 || 0
+                            totalSubmitters[pointsGroupingMethod][name] / _studentsVisibleCount * 100 || 0
                         ]);
                     });
 
@@ -1293,14 +1319,18 @@ let { map, publish, first, zip } = rxjs.operators;
             $("#table-body").append(htmlTablePoints);
             $(".colortag-active").css("margin-right", "5px");
             $("#student-count").append(
-                ' (<span id="selected-number">' + filteredStudentPool.length + '</span> / '
-                + '<span id="participants-number">'+ _students.length + '</span>'
+                ' (<span id="selected-number">' + _studentsVisibleCount + '</span> / '
+                + '<span id="participants-number">'+ _studentCount + '</span>'
                 + _(' students selected') + ')'
             );
             tableExportVar.reset();
             $('#table-points').find("caption").remove(); // Remove the recreated TableExport buttons (they are already in dropdown)
             $('.filtered-table').aplusTableFilter();
         }
+    }
+
+    function choosePointsGroupingMethod(method) {
+        
     }
 
     function addStudentRowToTable(student) {
@@ -1360,16 +1390,8 @@ let { map, publish, first, zip } = rxjs.operators;
         };
     }
 
-    /*
-    function observableAPI(url) {
-        return new Observable(function(observer) {
-            streamFromAPIPaging(observer, url);
-        });
-    }
-    */
 
-
-    const progressObserver = {
+    let progressObserver = {
         progress: 0,
         next() {
             this.progress++;
@@ -1385,32 +1407,27 @@ let { map, publish, first, zip } = rxjs.operators;
         }
     }
 
-    studentsSubject = new Subject();
-    studentsStream = new APIPagingStream(studentsSubject, studentsUrl);
+    let studentsSubject = new rxjs.Subject();
+    let studentsStream = new APIPagingStream(studentsSubject, studentsUrl);
+
+    let studentCounter = studentsSubject.pipe(count())
+                                        .subscribe(function (c) { _studentCount = c });
 
     //studentsSubject.subscribe(addStudentRowToTable);
-    studentsSubject.subscribe(progressObserver);
+    studentsSubject.pipe(tag("students"))
+                   .subscribe(progressObserver);
 
     // Student to points
-    pointsObservable = studentsSubject.pipe(
+    let pointsObservable = studentsSubject.pipe(
         map(studentToPoints),
-        publish(),
     );
 
-    studentsAndPointsObservable = zip(studentsSubject, pointsObservable, function (sp) { return {student:sp[0], points:sp[1]} });
+    let studentsAndPointsObservable = studentsSubject.pipe(
+        map(function(student) { return {student:student, points:studentToPoints(student)} }),
+    );
 
-    firstStudentObservable = studentsSubject.pipe(
-		first(),
-		publish(),
-	);
-
-    // Populate exercise selection
-    pointsObservable.pipe(
-        first(),
-        map(function(firstPoints) { 
-                firstPoints.then(populateExerciseSelection)
-            }),
-    ).subscribe();
+    studentsAndPointsObservable.pipe(tag("render"))
+                               .subscribe(studentRendererObserver);
 
     studentsSubject.pipe(
         first(),
@@ -1420,23 +1437,31 @@ let { map, publish, first, zip } = rxjs.operators;
                 })
             }),
     ).subscribe();
+    
+    //console.log(studentsSubject.constructor.name);
+    //console.log(studentsSubject);
+    //.do(function() {console.log("going to studentRendererObserver")})
 
-    studentsAndPointsObservable.subscribe(studentsRendererObserver);
+    // Populate exercise selection
+    pointsObservable.pipe(
+        first(),
+        map(function(firstPoints) { 
+                firstPoints.then(populateExerciseSelection)
+            }),
+    ).subscribe();
 
-    pointsObservable.connect();
-	firstStudentObservable.connect();
     studentsStream.start();
 
-    // TODO: 4.3. I decided to isolate the grouping methods by having method keys on the objects which store statistics, used in tableDrawPreWork and studentsRendererObserver.
-    //            I believe it could work now to some extent. Some syntax errors persist.
-    
-    
-    //       The next-method of the studentsRendererObserver is adapted to use pointsGroupingMethod properly 
-    //       (do things with one method that must be done once and so on).
-    //       The complete-method of the observer and the tableDrawPreWork need to be still adapted.
-    //       There should probably be some kind of an event for when the data in the table changes so that we can recalculate indicators etc.
-
     $("#table-points-div").show();
+
+
+
+    /* TODO: consider using rxjs.Observable.ajax.getJSON
+    */
+
+
+
+
     
     /*
      * The following code is responsible for handling all the ajax calls to get the data from /api/v2/
