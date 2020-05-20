@@ -24,6 +24,7 @@ spy.log("users");
     let _allExercises = [];
     let _exercises;
     let _students;
+    let _users = {};
     let _usertags;
     let _points = {};
     let _ajaxCompleted = false;
@@ -225,7 +226,7 @@ spy.log("users");
 
         // Pick only students that have the selected tags
         // Use same logic for tag filtering as in participants.js
-        let filteredStudentPool = [];
+        let = filteredStudentPool = [];
         _students.forEach(function(student) {
             const tagSlugFilters = $.makeArray($('.filter-users button:has(.glyphicon-check)'))
             .map(function(elem) {
@@ -429,7 +430,7 @@ spy.log("users");
             htmlTablePoints +=
                 '<td class="student-name stick-on-scroll">'
                 + '<a href="' + student.summary_html + '">'
-                + _points[sid].full_name + '</td>';
+                + _users[sid].full_name + '</td>';
 
             if (pointKeys.length > 0) {
                 let tagHtml = "";
@@ -1489,16 +1490,19 @@ spy.log("users");
         });
 
         let completedPointAjaxCalls = 0;
+        let completedUserAjaxCalls = 0;
         let completedExerciseAjaxCalls = 0;
         let successFirstStudent = false;
 
         let checkIfAllAjaxCompleted = function() {
+            const users_progress = completedUserAjaxCalls + " / " + requiredUserAjaxCalls;
             const exercises_progress = completedExerciseAjaxCalls + " / " + requiredExerciseAjaxCalls;
             const points_progress = completedPointAjaxCalls + " / " + requiredPointAjaxCalls;
-            const progress_report = exercises_progress + "<br>" + points_progress;
+            const progress_report = users_progress + "<br>" + exercises_progress + "<br>" + points_progress;
             $("#results-loading-progress").html(progress_report);
             if (completedPointAjaxCalls === requiredPointAjaxCalls &&
-                completedExerciseAjaxCalls === requiredExerciseAjaxCalls) {
+                completedExerciseAjaxCalls === requiredExerciseAjaxCalls &&
+                completedUserAjaxCalls === requiredUserAjaxCalls) {
                 _ajaxCompleted = true;
                 exerciseSelectionChange();
                 $("#results-loading-animation").hide();
@@ -1510,10 +1514,19 @@ spy.log("users");
         }
 
         _students.forEach(function(student) {
+            $.ajax(
+                $.extend({}, ajaxSettings, {url: student.url})
+            ).then(function(data) {
+                _users[sid] = data;
+                completedUserAjaxCalls++;
+                checkIfAllAjaxCompleted();
+            });
+
             const sid = student.id;
             $.ajax(
-                $.extend({}, ajaxSettings, {url: pointsUrl + sid + '/'})
+                $.extend({}, ajaxSettings, {url: pointsUrl + sid})
             ).then(function(data) {
+                console.log(data)
                 _points[sid] = data;
                 completedPointAjaxCalls++;
                 if (!successFirstStudent) {
