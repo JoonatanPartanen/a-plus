@@ -1,5 +1,5 @@
-const { Observable, Subject } = rxjs;
-const { map, first, count } = rxjs.operators;
+const { Observable, Subject, concat } = rxjs;
+const { map, first, count, ignoreElements } = rxjs.operators;
 
 const tag = rxjsSpy.operators.tag;
 spy = rxjsSpy.create();
@@ -1436,29 +1436,19 @@ spy.log("users");
         map(function(student) { return {student:student, points:studentToPoints(student)} }),
     );
 
-    studentsAndPointsObservable.pipe(tag("render"))
-                               .subscribe(studentRendererObserver);
-
-    studentsSubject.pipe(
+    // Prework with the first student
+    preworkObservable = studentsSubject.pipe(
         first(),
         map(function(firstOne) {
                 pointsGroupingMethods.forEach(function(pointsGroupingMethod) {
                     tableDrawPreWork(firstOne, pointsGroupingMethod);
                 })
             }),
-    ).subscribe();
-    
-    //console.log(studentsSubject.constructor.name);
-    //console.log(studentsSubject);
-    //.do(function() {console.log("going to studentRendererObserver")})
+    );
 
-    // Populate exercise selection
-    pointsObservable.pipe(
-        first(),
-        map(function(firstPoints) { 
-                firstPoints.then(populateExerciseSelection)
-            }),
-    ).subscribe();
+    // Do table prework, then render
+    concat(preworkObservable.pipe(ignoreElements()), studentsAndPointsObservable.pipe(tag("render")))
+           .subscribe(studentRendererObserver);
 
     // Start pipeline
     studentsStream.start();
