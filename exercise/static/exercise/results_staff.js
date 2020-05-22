@@ -782,6 +782,10 @@ spy.log("users");
 
     let ajaxEnabled = true;
 
+    /* Custom AJAX settings to use with jQuery.ajax()
+     * - Possibility to disable AJAX
+     * - Retrying and retry limits (call specific)
+     */
     let ajaxSettings = {
         _retryCount: 0,
         _retryLimit: 3,
@@ -793,8 +797,6 @@ spy.log("users");
             this._retryCount++;
             if (this.retryCount <= this._retryLimit) {
                 console.log("Retrying ajax:", statusText);
-                //const req = this;
-                //setTimeout(function() {$.ajax(req);}, 1000);
                 setTimeout($.ajax, 1000, this);
             } else {
                 stopAjax = true;
@@ -804,6 +806,10 @@ spy.log("users");
         }
     };
 
+
+    /* Take as the argument a single student's points 
+     * and populate the exercise and module selection dropdown menu
+     */
     function populateExerciseSelection(singleStudentPoints) {
         const firstStudentPoints = singleStudentPoints;
         firstStudentPoints.modules.forEach(function(module) {
@@ -854,6 +860,8 @@ spy.log("users");
         
     }
 
+    // Take as the argument an object representing a student 
+    // and return a boolean indicating whether or not the student should be shown in the results table
     function studentVisibility(student) {
         // Pick only students that have the selected tags
         // Use same logic for tag filtering as in participants.js
@@ -881,6 +889,7 @@ spy.log("users");
         });
     }
 
+    // Filter the students rows in the table, setting visibility
     function filterTable() {
         
         $('#table-points tr').each(function(){
@@ -890,6 +899,7 @@ spy.log("users");
         })
     }
 
+    // Return the grouping method currently in use
     function getGroupingMethod() { 
         if ($("#all-exercises").hasClass("active")) {
             return "all";
@@ -902,6 +912,7 @@ spy.log("users");
         }
     }
 
+    // Create an object with given keys and initialization value for each
     function initObjectWithKeys(keys, val) {
         let obj = {};
         keys.forEach(function (key) {
@@ -994,6 +1005,7 @@ spy.log("users");
         });
     }
 
+    // Renders students rows and indicators
     let studentRendererObserver = {
         // Gather personal information for each student, eg. individual points
         next(studentAndPoints) {
@@ -1013,7 +1025,7 @@ spy.log("users");
                 let points = {};
                 let unofficialPoints = {};
     
-                // Calculate points for each difficulty by grouping each each difficulty category exercises together
+                // Calculate points for each difficulty by grouping exercises from each difficulty category together
                 if (pointsGroupingMethod === "difficulty") {
                     let submittedDifficulty = {};
 
@@ -1046,7 +1058,7 @@ spy.log("users");
                     });
                 }
 
-                // Calculate points for each module by grouping each each module's exercises together
+                // Calculate points for each module by grouping each module's exercises together
                 if (pointsGroupingMethod === "module") {
                     modulesSeen[pointsGroupingMethod] = [];
 
@@ -1330,10 +1342,12 @@ spy.log("users");
         }
     }
 
+    // Show columns specific to a grouping method and hide others
     function choosePointsGroupingMethod(method) {
         
     }
 
+    // Add a student to the table as a row
     function addStudentRowToTable(student) {
         let htmlTablePoints = "";
         htmlTablePoints += '<tr><td class="student-id stick-on-scroll">' + student.student_id + '</td>';
@@ -1343,6 +1357,7 @@ spy.log("users");
         $("#table-body").append(htmlTablePoints);
     }
 
+    // Map a student to points, calling the API
     function studentToPoints(student) {
         const sid = student.id;
         return $.ajax(
@@ -1352,24 +1367,7 @@ spy.log("users");
         });
     }
 
-    function gatherFromAPIPaging(url) {
-        function gather(cur_result, url) {
-            return $.ajax(
-                $.extend({}, ajaxSettings, {url: url})
-            ).then(function(response) {
-                cur_result = cur_result.concat(response.results)
-                if (response.next) {
-                    return gather(cur_result, response.next);
-                } else {
-                    return cur_result
-                }
-            }, function(reason) {
-                throw new Error("Pagination ajax failed: " + reason.statusText);
-            });
-        }
-        return gather([], url);
-    }
-
+    // Stream data from a paged JSON API into an Observer
     function APIPagingStream(observer, url) {
         function stream(url) {
             return $.ajax(
@@ -1391,7 +1389,7 @@ spy.log("users");
         };
     }
 
-
+    // An object adhering to the observer interface that keeps track of loading progress and finishes rendering
     let progressObserver = {
         progress: 0,
         next() {
@@ -1408,21 +1406,32 @@ spy.log("users");
         }
     }
 
+    // Source for pipeline
     let studentsSubject = new rxjs.Subject();
     let studentsStream = new APIPagingStream(studentsSubject, studentsUrl);
 
-    let studentCounter = studentsSubject.pipe(count())
-                                        .subscribe(function (c) { _studentCount = c });
-
-    //studentsSubject.subscribe(addStudentRowToTable);
-    studentsSubject.pipe(tag("students"))
-                   .subscribe(progressObserver);
-
-    // Student to points
+    // Students => points
     let pointsObservable = studentsSubject.pipe(
         map(studentToPoints),
     );
+    
+    // Populate exercise selection
+    pointsObservable.pipe(
+        first(),
+        map(function(firstPoints) { 
+                firstPoints.then(populateExerciseSelection)
+            }),
+    ).subscribe();
 
+    // Save student count
+    let studentCounter = studentsSubject.pipe(count())
+                                        .subscribe(function (c) { _studentCount = c });
+
+    // Track data fetching progress
+    studentsSubject.pipe(tag("students"))
+                   .subscribe(progressObserver);
+
+    // Students + points in one for rendering
     let studentsAndPointsObservable = studentsSubject.pipe(
         map(function(student) { return {student:student, points:studentToPoints(student)} }),
     );
@@ -1451,8 +1460,10 @@ spy.log("users");
             }),
     ).subscribe();
 
+    // Start pipeline
     studentsStream.start();
 
+    // Show table (happends immediately because other calls asynchronous?)
     $("#table-points-div").show();
 
 
@@ -1461,142 +1472,6 @@ spy.log("users");
     */
 
 
-
-
-    
-    /*
-     * The following code is responsible for handling all the ajax calls to get the data from /api/v2/
-     * The code also initializes the module and exercise selection options.
-     * Creates the table for the first time, when all ajax calls have finished.
-     * READER WARNING: You are entering callback hell.
-     */
-
-    /*
-    $.when(gatherFromAPIPaging(exercisesUrl), gatherFromAPIPaging(studentsUrl), gatherFromAPIPaging(usertagsUrl))
-        .done(function(exercisesPagedResults, studentsPagedResults, usertagsPagedResults) {
-        _exercises = exercisesPagedResults;
-        _students = studentsPagedResults;
-        _usertags = usertagsPagedResults;
-        
-        //_exercisesSubject = new Subject<Array>();
-
-        let requiredPointAjaxCalls = _students.length;
-        let requiredUserAjaxCalls = _students.length;
-        let requiredExerciseAjaxCalls = 0;
-        _exercises.forEach(function(module) {
-            module.exercises.forEach(function(exercise) {
-                requiredExerciseAjaxCalls++;
-            });
-        });
-
-        let completedPointAjaxCalls = 0;
-        let completedUserAjaxCalls = 0;
-        let completedExerciseAjaxCalls = 0;
-        let successFirstStudent = false;
-
-        let checkIfAllAjaxCompleted = function() {
-            const users_progress = completedUserAjaxCalls + " / " + requiredUserAjaxCalls;
-            const exercises_progress = completedExerciseAjaxCalls + " / " + requiredExerciseAjaxCalls;
-            const points_progress = completedPointAjaxCalls + " / " + requiredPointAjaxCalls;
-            const progress_report = users_progress + "<br>" + exercises_progress + "<br>" + points_progress;
-            $("#results-loading-progress").html(progress_report);
-            if (completedPointAjaxCalls === requiredPointAjaxCalls &&
-                completedExerciseAjaxCalls === requiredExerciseAjaxCalls &&
-                completedUserAjaxCalls === requiredUserAjaxCalls) {
-                _ajaxCompleted = true;
-                exerciseSelectionChange();
-                $("#results-loading-animation").hide();
-                $("#results-loading-progress").hide();
-                $("#table-export-dropdown > button").removeAttr('disabled');
-                $("#table-points-div").show();
-                storeDataLocally('localStorage', storageKey, toStorage())
-            }
-        }
-
-        _students.forEach(function(student) {
-            $.ajax(
-                $.extend({}, ajaxSettings, {url: student.url})
-            ).then(function(data) {
-                _users[sid] = data;
-                completedUserAjaxCalls++;
-                checkIfAllAjaxCompleted();
-            });
-
-            const sid = student.id;
-            $.ajax(
-                $.extend({}, ajaxSettings, {url: pointsUrl + sid})
-            ).then(function(data) {
-                console.log(data)
-                _points[sid] = data;
-                completedPointAjaxCalls++;
-                if (!successFirstStudent) {
-                    successFirstStudent = true;
-                    const firstStudentPoints = Object.values(_points)[0];
-                    firstStudentPoints.modules.forEach(function(module) {
-                        $("#module-selection").append(
-                            '<option value="module-' + module.id + '"'
-                            + 'selected>'
-                            + module.name
-                            + '</option>'
-                        );
-                        $("#exercise-selection").append(
-                            '<optgroup class="module-' + module.id + '"'
-                            + 'value="module-' + module.id + '"'
-                            + 'label="' + module.name + '"'
-                            + '></optgroup'
-                        );
-                        module.exercises.forEach(function(exercise) {
-                            $("#exercise-selection > optgroup:last-child").append(
-                                '<option data-module-id="' + module.id + '"'
-                                + 'data-exercise-id="' + exercise.id + '"'
-                                + 'class="module-'+ module.id + '"'
-                                + 'value="exercise-'+ exercise.id + '"'
-                                + 'selected>'
-                                + exercise.name
-                                + '</option>'
-                            );
-                        });
-                    });
-
-                    $('#module-selection').multiselect({
-                        includeSelectAllOption: true,
-                        onDeselectAll: moduleSelectionChange,
-                        onSelectAll: moduleSelectionChange,
-                        onChange: moduleSelectionChange,
-                        buttonText: buttonText,
-                        selectAllText: _("Select all"),
-                    });
-
-                    $('#exercise-selection').multiselect({
-                        includeSelectAllOption: true,
-                        enableClickableOptGroups: true,
-                        onDeselectAll: exerciseSelectionChange,
-                        onSelectAll: exerciseSelectionChange,
-                        onChange: exerciseSelectionChange,
-                        maxHeight: 500,
-                        buttonText: buttonText,
-                        selectAllText: _("Select all"),
-                    });
-                }
-                checkIfAllAjaxCompleted();
-            });
-        });
-
-        _exercises.forEach(function(module) {
-            module.exercises.forEach(function(exercise) {
-                $.ajax(
-                    $.extend({}, ajaxSettings, {url: exercise.url})
-                ).then(function(data) {
-                    _allExercises.push(data);
-                    completedExerciseAjaxCalls++;
-                    checkIfAllAjaxCompleted();
-                });
-            });
-        });
-
-
-    });
-    */
 
 })(jQuery, document, window);
 
