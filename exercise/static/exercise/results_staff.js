@@ -1006,6 +1006,7 @@ spy.log("users");
     }
 
     // Renders students rows and indicators
+    // FIXME: Indicators and tags don't work
     let studentRendererObserver = {
         // Gather personal information for each student, eg. individual points
         next(studentAndPoints) {
