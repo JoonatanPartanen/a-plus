@@ -795,7 +795,7 @@ spy.log("users");
         },
         error: function(xhr, statusText, errorThrown) {
             this._retryCount++;
-            if (this.retryCount <= this._retryLimit) {
+            if (this._retryCount <= this._retryLimit) {
                 console.log("Retrying ajax:", statusText);
                 setTimeout($.ajax, 1000, this);
             } else {
