@@ -1340,6 +1340,7 @@ spy.log("users");
             tableExportVar.reset();
             $('#table-points').find("caption").remove(); // Remove the recreated TableExport buttons (they are already in dropdown)
             $('.filtered-table').aplusTableFilter();
+            console.log("Rendering complete");
         }
     }
 
