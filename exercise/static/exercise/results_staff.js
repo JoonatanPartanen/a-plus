@@ -1408,6 +1408,11 @@ spy.log("users");
         }
     }
 
+
+    /*
+     *  Setting up pipeline
+     */
+
     // Source for pipeline
     let studentsSubject = new rxjs.Subject();
     let studentsStream = new APIPagingStream(studentsSubject, studentsUrl);
